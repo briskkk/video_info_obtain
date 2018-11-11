@@ -1,9 +1,11 @@
 # -*- coding:UTF-8 -*-
  
-# 这个程序用多进程来爬去b站视频中播放量过10w的av号
+# 这个程序用多线程来获取b站视频中播放量过1w的av号(从1-1000遍历aid号)
+# 最后写入txt文件中：hot_video.txt
+# 例如：
 # {"code":0,"message":"0","ttl":1,
-# "data":{"aid":23,"view":"--","danmaku":69619,"reply":23402,"favorite":55513,"coin":6196,"share":15953,
-# "now_rank":0,"his_rank":173,"like":9313,"dislike":114,"no_reprint":0,"copyright":2}}
+# "data":{"aid":1,"view":"--","danmaku":10000,"reply":10000,"favorite":10000,"coin":1000,"share":10000,
+# "now_rank":0,"his_rank":173,"like":10000,"dislike":1,"no_reprint":0,"copyright":2}}
 
 import os
 import json
@@ -31,8 +33,8 @@ class MyThread(threading.Thread):
 			return None
 
 def main1():
-	S_AID = 6 # 起始aid号
-	E_AID = 100 # 结束aid号
+	S_AID = 1 # 起始aid号
+	E_AID = 1000 # 结束aid号
 	
 	print("#######################")
 	starttime = time()
