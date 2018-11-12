@@ -49,7 +49,7 @@ def main1():
 	for m in results:
 		m.join()
 		results2.append(m.get_result())
-		# print(results2)
+		print(results2)
 	parse_video(results2)
 	endtime = time()
 	print('All subprocesses done.')
@@ -93,7 +93,7 @@ def parse_video(video_messages_list):
 		# print(video)
 	for video in video_messages_list:
 		if(video[1] == -1):
-			print("第" + str(number) + "个视频不存在")
+			# print("第" + str(number) + "个视频不存在")
 			number += 1
 		elif(int(video[4]) >= 100000):
 			num_of_hot_video += 1
