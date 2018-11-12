@@ -17,7 +17,7 @@ import threading
 
 
 def main1():
-	LEN_POOL = 25 # pool 中的 process 数量
+	LEN_POOL = 10 # pool 中的 process 数量
 	S_AID = 1 # 起始aid号
 	E_AID = 1000 # 结束aid号
 	
@@ -30,11 +30,12 @@ def main1():
 	for i in range(group_pro):
 		for j in range(LEN_POOL):
 			ret = pool.apply_async(require_video,args=(i*LEN_POOL+aidlist[j],))
-			results.append(ret)
+			results.append(ret.get())
+			print(ret.get())
 	print('Waiting for all subprocesses done...')
 	pool.close()
 	pool.join()
-	print(results[0]) # 每个视频的信息list
+	# print(results[0]) # 每个视频的信息list
 	parse_video(results)
 	endtime = time()
 	print('All subprocesses done.')
@@ -74,9 +75,9 @@ def parse_video(video_messages_list):
 	# for video_id in range(6,100):
 		# video = require_video(video_id)
 		# print(video)
-	for video in video_messages_list[0]:
+	for video in video_messages_list:
 		if(video[1] == -1):
-			print("第" + str(number) + "个视频不存在")
+			# print("第" + str(number) + "个视频不存在")
 			number += 1
 		elif(int(video[4]) >= 100000):
 			num_of_hot_video += 1
