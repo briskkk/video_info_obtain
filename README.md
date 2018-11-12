@@ -8,16 +8,17 @@
 "now_rank":0,"his_rank":173,"like":10000,"dislike":1,"no_reprint":0,"copyright":2}}
 ```
 信息输出到文本中的格式：
-	>av号：2播放量：446105
-	>收藏：11729
-	>弹幕数：24072
-	>硬币数：4627
-	>分享数：2860
-	>评论数：26725
-	>顶：7885
-	>踩：102
-	
-	使用到的python库：**multiprocessing** 和 **threading**
+```
+av号：2播放量：446105
+收藏：11729
+弹幕数：24072
+硬币数：4627
+分享数：2860
+评论数：26725
+顶：7885
+踩：102
+```	
+	使用到的python库：multiprocessing 和 threading
 	multiprocessing为多进程库，可创建进程池pool。
 	multiprocessing_map使用了pool中的map函数；
 	multiprocessing_async使用了pool中的apply_async函数。
