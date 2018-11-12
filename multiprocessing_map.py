@@ -68,7 +68,7 @@ def parse_video(video_messages_list):
 		# print(video)
 	for video in video_messages_list[0]:
 		if(video[1] == -1):
-			print("第" + str(number) + "个视频不存在")
+			# print("第" + str(number) + "个视频不存在")
 			number += 1
 		elif(int(video[4]) >= 100000):
 			num_of_hot_video += 1
