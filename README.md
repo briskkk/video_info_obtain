@@ -20,9 +20,9 @@ av号：2播放量：446105
 踩：102
 ```	
 **使用到的python库：multiprocessing 和 threading**  
-multiprocessing为多进程库，可创建进程池pool。  
-multiprocessing_map使用了pool中的map函数；  
-multiprocessing_async使用了pool中的apply_async函数。  
-threading为多线程库，  
-threading_test创建多线程完成任务，但没有引入线程池概念。  
+&ensp;&ensp;multiprocessing为多进程库，可创建进程池pool。  
+&ensp;&ensp;multiprocessing_map使用了pool中的map函数；  
+&ensp;&ensp;multiprocessing_async使用了pool中的apply_async函数。  
+&ensp;&ensp;threading为多线程库，  
+&ensp;&ensp;threading_test创建多线程完成任务，但没有引入线程池概念。  
 
