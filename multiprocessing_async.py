@@ -40,9 +40,6 @@ def main1():
 	endtime = time()
 	print('All subprocesses done.')
 	print('Use time is ',(endtime-starttime))
-	# global timer
-	# timer = threading.Timer(30, main1)
-	# timer.start()
 
 
 def require_video(video_id):
