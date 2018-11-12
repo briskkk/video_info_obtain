@@ -94,7 +94,7 @@ def parse_video(video_messages_list):
 			number += 1
 	f.write("************************************************\n")
 	f.close()
-	print("av号从7开始的视频中播放数超过10w的视频有" + str(num_of_hot_video) + "个")
+	print("av号从1开始的视频中播放数超过1w的视频有" + str(num_of_hot_video) + "个")
 
 
 if __name__ == "__main__":
