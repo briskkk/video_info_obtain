@@ -5,8 +5,8 @@
 ### 信息格式：
 ```
 {"code":0,"message":"0","ttl":1,
-"data":{"aid":1,"view":"--","danmaku":10000,"reply":10000,"favorite":10000,"coin":1000,"share":10000,
-"now_rank":0,"his_rank":173,"like":10000,"dislike":1,"no_reprint":0,"copyright":2}}
+"data":{"aid":2,"view":"--","danmaku":24072,"reply":26725,"favorite":11729,"coin":4627,"share":2860,
+"now_rank":0,"his_rank":173,"like":7885,"dislike":102,"no_reprint":0,"copyright":2}}
 ```
 ### 信息输出到文本中的格式：
 ```
