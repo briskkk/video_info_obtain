@@ -58,8 +58,8 @@ def get_video_info(page_num):
 		
 def create_video_db():
 	# 创建数据库
-	global cur
-	cur.execute("""create table if not exists bili_video
+	global cursor
+	cursor.execute("""create table if not exists bili_video
 					(v_aid int primary key,
 					v_title text,
 					v_biaoqian text,
@@ -77,7 +77,7 @@ def create_video_db():
 				
 def save_video_db(video_instance_per_page):
 	# 将数据保存至本地
-	global cur,conn
+	global cursor,conn
 	sql = "insert into bili_video values(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);"
 	for video_instance in video_instance_per_page:
 		row = [video_instance.aid,
@@ -96,7 +96,7 @@ def save_video_db(video_instance_per_page):
 				]
 		try:
 			# 执行sql语句
-			cur.execute(sql,row)
+			cursor.execute(sql,row)
 		except:
 			# 发生错误时回滚
 			conn.rollback()
@@ -108,12 +108,9 @@ if __name__ == "__main__":
 	
 	# 将数据存入数据库
 	# 建立和数据库系统的连接
-	conn = pymysql.connect(host='localhost',port=3306,user='root',password='mysql',charset='utf8')
+	conn = pymysql.connect(host='localhost',port=3306,user='root',password='mysql',database='video_db',charset='utf8')
 	# 创建游标
 	cursor = conn.cursor()
-	# 创建一个数据库
-	cursor.execute("create database if not exists video_db")
-	conn.commit()
 	# 创建数据库中表格bili_video
 	create_video_db()
 	
