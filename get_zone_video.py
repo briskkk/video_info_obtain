@@ -1,6 +1,7 @@
 # -*- coding:UTF-8 -*-
  
 # 获取单机游戏的视频列表，tid=17
+# 将全部信息获取到video_info_all中，再写入数据库
 
 import os
 import json
@@ -9,6 +10,9 @@ import platform
 from time import *
 from multiprocessing.dummy import Pool as ThreadPool
 from classes import *
+import pymysql
+
+video_info_all = []
 
 # 先访问page1，然后可以获取到一共有多少个视频，按照每页放50个（经测试最多可以放50个，数量继续增加无效），做除法得到共分为多少页，再对每页进行遍历，获取每个视频的aid好以及标签，之后根据aid的URL获取每个aid的具体点赞量等信息。
 # get_page_num -- 获取视频排行总页数（每页设置为50个）
@@ -28,6 +32,7 @@ def get_video_info(page_num):
 	video_info_list = []
 	URL_PAGE = URL_zone + "&pn={0}&ps=50".format(page_num)
 	VID_INFO = requests.get(url = URL_PAGE).json()  # 从第page_count页获取视频列表
+	sleep(0.5)  # 延迟，避免太快ip被封
 	VID_ARCHIVES = VID_INFO['data']['archives']  # 每页中视频列表及每个视频标签等信息
 	for video_count in range(len(VID_ARCHIVES)):  # 获取50个视频中每个视频的信息，传到对象Video中
 		video = Video()
@@ -51,55 +56,89 @@ def get_video_info(page_num):
 	
 # 已完成视频信息的读取以及多线程的实现，接下来需要把信息存到数据库，周期运行代码功能。
 		
-# def parse_video(video_messages_list):
-	# num_of_hot_video = 0
-	# number = 1
-	# f = open("hot_video.txt" , "w")
-	# f.write("***********************************************\n")
-	# # for video_id in range(6,100):
-		# # video = require_video(video_id)
-		# # print(video)
-	# for video in video_messages_list[0]:
-		# if(video[1] == -1):
-			# # print("第" + str(number) + "个视频不存在")
-			# number += 1
-		# elif(int(video[4]) >= 100000):
-			# num_of_hot_video += 1
-			# f.write("av号：" + str(video[0]) + "播放量：" + str(video[4]) + "\n")
-			# f.write("收藏：" + str(video[1]) + "\n")
-			# f.write("弹幕数：" + str(video[2]) + "\n")
-			# f.write("硬币数：" + str(video[3]) + "\n")
-			# f.write("分享数：" + str(video[5]) + "\n")
-			# f.write("评论数：" + str(video[6]) + "\n")
-			# f.write("顶：" + str(video[7]) + "\n")
-			# f.write("踩：" + str(video[8]) + "\n\n")
-			# print("第" + str(number) + "个视频的播放量为：" + str(video[4]))
-			# number += 1
-		# else:
-			# number += 1
-	# f.write("************************************************\n")
-	# f.close()
-	# print("av号从1开始的视频中播放数超过1w的视频有" + str(num_of_hot_video) + "个")
+def create_video_db():
+	# 创建数据库
+	global cur
+	cur.execute("""create table if not exists bili_video
+					(v_aid int primary key,
+					v_title text,
+					v_biaoqian text,
+					v_view int,
+					v_danmu int,
+					v_reply int,
+					v_favor int,
+					v_coin int,
+					v_share int,
+					v_like int,
+					v_dislike int,
+					v_author_mid int,
+					v_author_name text)
+				""")
+				
+def save_video_db(video_instance_per_page):
+	# 将数据保存至本地
+	global cur,conn
+	sql = "insert into bili_video values(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);"
+	for video_instance in video_instance_per_page:
+		row = [video_instance.aid,
+				video_instance.title,
+				video_instance.biaoqian,
+				video_instance.view,
+				video_instance.danmu,
+				video_instance.reply,
+				video_instance.shoucang,
+				video_instance.coin,
+				video_instance.share,
+				video_instance.like,
+				video_instance.dislike,
+				video_instance.author_mid,
+				video_instance.author_name
+				]
+		try:
+			# 执行sql语句
+			cur.execute(sql,row)
+		except:
+			# 发生错误时回滚
+			conn.rollback()
+	# 提交到数据库执行
+	conn.commit()
 
 
 if __name__ == "__main__":
+	
+	# 将数据存入数据库
+	# 连接数据库
+	conn = pymysql.connect(host='localhost',port=3306,user='root',password='mysql',database='video_db',charset='utf8')
+	# 创建游标
+	cursor = conn.cursor()
+	# 创建数据库中表格bili_video
+	create_video_db()
+	
 	URL_zone = "https://api.bilibili.com/x/web-interface/newlist?rid=17&type=0"
-	num_of_pages = get_page_num(URL_zone)
+	num_of_pages = get_page_num(URL_zone)  # 获取视频排行总页数（每页设置为50个）
 	print('num of pages: '+str(num_of_pages))
 	print("#######################")
 	starttime = time()
 	# pagelist = range(1,num_of_pages+1)
 	pagelist = range(1,9)
-	video_info_all = []
 	pool = ThreadPool(8)
 	ret = pool.map(get_video_info,pagelist)
 	video_info_all = video_info_all+ret
 	pool.close()
 	pool.join()
+	# 将所有视频信息传入数据库
+	for video_per_page in video_info_all:
+		save_video_db(video_per_page)
 	# print(results[0]) # 每个视频的信息list
 	# parse_video(results)
 	endtime = time()
 	print('Use time is ',(endtime-starttime))
-	for i in range(50):
-		print(video_info_all[0][i].like)
+	print('total pages %s' % str(num_of_pages))
+	# for i in range(50):
+		# print(video_info_all[0][i].like)
 	# video_info_all[i] -- 第i页的所有video对象，video_info_all[i][j] -- 第i页第j个video对象
+
+	# 关闭游标
+	cursor.close()
+	# 关闭连接
+	conn.close()
