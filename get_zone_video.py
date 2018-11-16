@@ -107,10 +107,13 @@ def save_video_db(video_instance_per_page):
 if __name__ == "__main__":
 	
 	# 将数据存入数据库
-	# 连接数据库
-	conn = pymysql.connect(host='localhost',port=3306,user='root',password='mysql',database='video_db',charset='utf8')
+	# 建立和数据库系统的连接
+	conn = pymysql.connect(host='localhost',port=3306,user='root',password='mysql',charset='utf8')
 	# 创建游标
 	cursor = conn.cursor()
+	# 创建一个数据库
+	cursor.execute("create database if not exists video_db")
+	conn.commit()
 	# 创建数据库中表格bili_video
 	create_video_db()
 	
