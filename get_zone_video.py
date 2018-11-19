@@ -11,6 +11,7 @@ from time import *
 from multiprocessing.dummy import Pool as ThreadPool
 from classes import *
 import pymysql
+from secret import *
 
 video_info_all = []
 
@@ -108,7 +109,7 @@ if __name__ == "__main__":
     
     # 将数据存入数据库
     # 建立和数据库系统的连接
-    conn = pymysql.connect(host='localhost',port=3306,user='root',password='mysql',database='video_db',charset='utf8')
+    conn = pymysql.connect(host=HOST_IP,port=3306,user=USER,password=USER_PASSWD,database='video_db',charset='utf8')
     # 创建游标
     cursor = conn.cursor()
     # 创建数据库中表格bili_video
