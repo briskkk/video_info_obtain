@@ -61,14 +61,14 @@ def save_video_db(TABLE_INDEX):
     print("data:{}".format(data))
     print("view{}".format(num1))
 
-    # if num1 > 1 and data == None:  # 此aid已经有数据，更新值为NULL的值，即添加数据到view(num1)
-    sql = "update test_{0} set view{1}=%s".format(TABLE_INDEX,num1)
-    row = [num1,]
-    try:
-        cursor.execute(sql,row)
-    except:
-        conn.rollback()
-    conn.commit()
+    if num1 > 1 and data == None:  # 此aid已经有数据，更新值为NULL的值，即添加数据到view(num1)
+        sql = "update test_{0} set view{1}=%s".format(TABLE_INDEX,num1)
+        row = [num1,]
+        try:
+            cursor.execute(sql,row)
+        except:
+            conn.rollback()
+        conn.commit()
     # elif num1 > 1 and data != None:  # 此表格预留的空位已经填满，需要新建一个表格继续填写
     #     TABLE_INDEX = TABLE_INDEX + 1
     #     create_video_db(TABLE_INDEX)
