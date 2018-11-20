@@ -64,16 +64,17 @@ def create_video_db():
                     (v_aid int primary key,
                     v_title text,
                     v_biaoqian text,
-                    v_view int,
-                    v_danmu int,
-                    v_reply int,
-                    v_favor int,
-                    v_coin int,
-                    v_share int,
-                    v_like int,
-                    v_dislike int,
                     v_author_mid int,
-                    v_author_name text)
+                    v_author_name text,
+                    v_view1 int,v_view2 int,v_view3 int,v_view4 int,v_view5 int,v_view6 int,v_view7 int,v_view8 int,
+                    v_danmu1 int,v_danmu2 int,v_danmu3 int,v_danmu4 int,v_danmu5 int,v_danmu6 int,v_danmu7 int,v_danmu8 int,
+                    v_reply1 int,v_reply2 int,v_reply3 int,v_reply4 int,v_reply5 int,v_reply6 int,v_reply7 int,v_reply8 int,
+                    v_favor1 int,v_favor2 int,v_favor3 int,v_favor4 int,v_favor5 int,v_favor6 int,v_favor7 int,v_favor8 int,
+                    v_coin1 int,v_coin2 int,v_coin3 int,v_coin4 int,v_coin5 int,v_coin6 int,v_coin7 int,v_coin8 int,
+                    v_share1 int,v_share2 int,v_share3 int,v_share4 int,v_share5 int,v_share6 int,v_share7 int,v_share8 int,
+                    v_like1 int,v_like2 int,v_like3 int,v_like4 int,v_like5 int,v_like6 int,v_like7 int,v_like8 int,
+                    v_dislike1 int,v_dislike2 int,v_dislike3 int,v_dislike4 int,v_dislike5 int,v_dislike6 int,v_dislike7 int,v_dislike8 int
+                    )
                 """)
                 
 def save_video_db(video_instance_per_page):
