@@ -37,7 +37,7 @@ def get_video_info(page_num):
     video_info_list = []
     URL_PAGE = URL_zone + "&pn={0}&ps=50".format(page_num)
     VID_INFO = requests.get(url = URL_PAGE).json()  # 从第page_count页获取视频列表
-    sleep(0.5)  # 延迟，避免太快ip被封
+    # sleep(0.5)  # 延迟，避免太快ip被封
     VID_ARCHIVES = VID_INFO['data']['archives']  # 每页中视频列表及每个视频标签等信息
     for video_count in range(len(VID_ARCHIVES)):  # 获取50个视频中每个视频的信息，传到对象Video中
         video = Video()
@@ -67,16 +67,16 @@ def create_tcount():
     cursor.execute("""create table if not exists t_count
                     (opera_count int)
                 """)
-    cursor.execute("select opera_count from t_count")
+    cursor.execute("select opera_count from t_count;")
     if cursor.fetchone() == None:
-        cursor.execute("insert into t_count set opera_count={}".format(1))
+        cursor.execute("insert into t_count set opera_count={};".format(1))
     conn.commit()
 
 def save_count():
     global cursor,conn
-    cursor.execute("select opera_count from t_count")
+    cursor.execute("select opera_count from t_count;")
     operacount = cursor.fetchone()[0]
-    cursor.execute("update t_count set opera_count=%d" % (operacount+1))
+    cursor.execute("update t_count set opera_count=%d;" % (operacount+1))
     return operacount
 
 def create_table_bili_video(TABLE_INDEX):
@@ -104,27 +104,37 @@ def save_video_db(video_instance_per_page,table_index):
     global cursor,conn
     for video_instance in video_instance_per_page:  # 对于每一个video对象，首先查询是否已经在第table_index存在，如果不存在--insert，如果存在--update
         for v_num in range(1,9):  # 查询第几行的v_view为空，将新值插入
-            cursor.execute("select v_view{0} from bili_video_{1} where v_aid={2}".format(v_num,table_index,video_instance.aid))
+            cursor.execute("select v_view{0} from bili_video_{1} where v_aid={2};".format(v_num,table_index,video_instance.aid))
             fet = cursor.fetchone()
-            print(fet)
+            print("fet:%s"%fet)
+            # print(video_instance.aid)
             if fet == None:  # 如果某个aid号还没有加到表中
-                sql_ins = "insert into bili_video_{0} set v_aid=%s,v_title=%s,\
-                v_biaoqian=%s,v_author_mid=%s,v_author_name=%s,v_view{1}=%s,\
-                v_danmu{2}=%s,v_reply{3}=%s,v_favor{4}=%s,v_coin{5}=%s,v_share{6}=%s,\
-                v_like{7}=%s,v_dislike{8}=%s".format(table_index,v_num,v_num,v_num,v_num,v_num,v_num,v_num,v_num)
-                row1 = [video_instance.aid,
+                sql_ins = "insert into bili_video_%s set v_aid=%s,v_title=%s,\
+                v_biaoqian=%s,v_author_mid=%s,v_author_name=%s,v_view%s=%s,\
+                v_danmu%s=%s,v_reply%s=%s,v_favor%s=%s,v_coin%s=%s,v_share%s=%s,\
+                v_like%s=%s,v_dislike%s=%s;"
+                row1 = [table_index,
+                        video_instance.aid,
                         video_instance.title,
                         video_instance.biaoqian,
-                        video_instance.view,
-                        video_instance.danmu,
-                        video_instance.reply,
-                        video_instance.shoucang,
-                        video_instance.coin,
-                        video_instance.share,
-                        video_instance.like,
-                        video_instance.dislike,
                         video_instance.author_mid,
-                        video_instance.author_name
+                        video_instance.author_name,
+                        v_num,
+                        video_instance.view,
+                        v_num,
+                        video_instance.danmu,
+                        v_num,
+                        video_instance.reply,
+                        v_num,
+                        video_instance.shoucang,
+                        v_num,
+                        video_instance.coin,
+                        v_num,
+                        video_instance.share,
+                        v_num,
+                        video_instance.like,
+                        v_num,
+                        video_instance.dislike
                         ]
                 try:
                     # 执行sql_ins语句
@@ -139,18 +149,29 @@ def save_video_db(video_instance_per_page,table_index):
                 data = fet[0]  # 返回某aid对应的view值，若为空，则跳出循环，并获得view序号
                 if not data:
                     break
+        print("#################")
         if v_num > 1 and data == None:  # 此aid已经有数据，更新值为NULL的值，即添加数据到view(num1)
-            sql_update = "update bili_video_{0} set v_view{1}=%s,v_danmu{2}=%s,\
-            v_reply{3}=%s,v_favor{4}=%s,v_coin{5}=%s,v_share{6}=%s,v_like{7}=%s,\
-            v_dislike{8}=%s".format(table_index,v_num,v_num,v_num,v_num,v_num,v_num,v_num,v_num)
-            row2 = [video_instance.view,
+            sql_update = "update bili_video_%s set v_view%s=%s,v_danmu%s=%s,\
+            v_reply%s=%s,v_favor%s=%s,v_coin%s=%s,v_share%s=%s,v_like%s=%s,\
+            v_dislike%s=%s where v_aid=%s;"
+            row2 = [table_index,
+                    v_num,
+                    video_instance.view,
+                    v_num,
                     video_instance.danmu,
+                    v_num,
                     video_instance.reply,
+                    v_num,
                     video_instance.shoucang,
+                    v_num,
                     video_instance.coin,
+                    v_num,
                     video_instance.share,
+                    v_num,
                     video_instance.like,
-                    video_instance.dislike
+                    v_num,
+                    video_instance.dislike,
+                    video_instance.aid
                     ]
             try:
                 cursor.execute(sql_update,row2)
@@ -213,10 +234,10 @@ def interval_trigger():
 
 
 if __name__ == "__main__":
-    #scheduler.add_job(timedTask,'interval',hours=3)
-    interval_trigger()
-    try:
-        scheduler.start()
-    except (KeyboardInterrupt, SystemExit):
-        scheduler.shutdown() #关闭job
-    sleep(150)
+    # interval_trigger()
+    # try:
+    #     scheduler.start()
+    # except (KeyboardInterrupt, SystemExit):
+    #     scheduler.shutdown() #关闭job
+    # sleep(150)
+    task_bili()
