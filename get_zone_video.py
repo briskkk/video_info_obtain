@@ -1,7 +1,11 @@
 # -*- coding:UTF-8 -*-
  
-# 获取单机游戏的视频列表，tid=17
+# 获取单机游戏前八页的视频列表，每页50个，tid=17
 # 将全部信息获取到video_info_all中，再写入数据库
+# 每隔两分钟运行一次，第一次运行要等待两分钟，待优化。
+# 写入数据的过程中，搜索每个aid号的视频是否存在，若不存在，则添加新的一行；若存在，则更新。更新方法为，查看v_view_n是否为None，若n为
+# None，则填入这一个位置，若不为None，则填入下一个位置。每运行八次脚本新建一个列表。但是在填v_view_n时，后期无法查看到该时间，下一步
+# 需要在get_zone_video_v2中加入时间戳。
 
 import os
 import json
@@ -230,14 +234,13 @@ def task_bili():
 # 循环执行
 def interval_trigger():
     global scheduler
-    scheduler.add_job(func=task_bili, trigger='interval', seconds=30, id='interval_job1')  #返回一个apscheduler.job.Job的实例，可以用来改变或者移除job
+    scheduler.add_job(func=task_bili, trigger='interval', seconds=2, id='interval_job1')  #返回一个apscheduler.job.Job的实例，可以用来改变或者移除job
 
 
 if __name__ == "__main__":
-    # interval_trigger()
-    # try:
-    #     scheduler.start()
-    # except (KeyboardInterrupt, SystemExit):
-    #     scheduler.shutdown() #关闭job
-    # sleep(150)
-    task_bili()
+    interval_trigger()
+    try:
+        scheduler.start()
+    except (KeyboardInterrupt, SystemExit):
+        scheduler.shutdown() #关闭job
+    sleep(150)
