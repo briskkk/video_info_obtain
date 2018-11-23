@@ -1,7 +1,11 @@
 # -*- coding:UTF-8 -*-
  
-# 获取单机游戏的视频列表，tid=17
+# 获取单机游戏前八页的视频列表，每页50个，tid=17
 # 将全部信息获取到video_info_all中，再写入数据库
+# 每隔两分钟运行一次，第一次运行要等待两分钟，待优化。
+# 写入数据的过程中，搜索每个aid号的视频是否存在，若不存在，则添加新的一行；若存在，则更新。更新方法为，查看v_view_n是否为None，若n为
+# None，则填入这一个位置，若不为None，则填入下一个位置。每运行八次脚本新建一个列表。但是在填v_view_n时，后期无法查看到该时间，下一步
+# 需要在get_zone_video_v2中加入时间戳。
 
 import os
 import json
@@ -99,77 +103,74 @@ def create_table_bili_video(TABLE_INDEX):
                     )
                 """.format(TABLE_INDEX))
                 
-def save_video_db(video_instance_per_page,table_index):
+def save_video_db(video_instance_per_page,table_index,script_call_count):
     # 将数据保存至服务器MySQL数据库中
     global cursor,conn
     for video_instance in video_instance_per_page:  # 对于每一个video对象，首先查询是否已经在第table_index存在，如果不存在--insert，如果存在--update
-        for v_num in range(1,9):  # 查询第几行的v_view为空，将新值插入
-            cursor.execute("select v_view{0} from bili_video_{1} where v_aid={2};".format(v_num,table_index,video_instance.aid))
-            fet = cursor.fetchone()
-            print("fet:%s"%fet)
-            # print(video_instance.aid)
-            if fet == None:  # 如果某个aid号还没有加到表中
-                sql_ins = "insert into bili_video_%s set v_aid=%s,v_title=%s,\
-                v_biaoqian=%s,v_author_mid=%s,v_author_name=%s,v_view%s=%s,\
-                v_danmu%s=%s,v_reply%s=%s,v_favor%s=%s,v_coin%s=%s,v_share%s=%s,\
-                v_like%s=%s,v_dislike%s=%s;"
-                row1 = [table_index,
-                        video_instance.aid,
-                        video_instance.title,
-                        video_instance.biaoqian,
-                        video_instance.author_mid,
-                        video_instance.author_name,
-                        v_num,
-                        video_instance.view,
-                        v_num,
-                        video_instance.danmu,
-                        v_num,
-                        video_instance.reply,
-                        v_num,
-                        video_instance.shoucang,
-                        v_num,
-                        video_instance.coin,
-                        v_num,
-                        video_instance.share,
-                        v_num,
-                        video_instance.like,
-                        v_num,
-                        video_instance.dislike
-                        ]
-                try:
-                    # 执行sql_ins语句
-                    cursor.execute(sql_ins,row1)
-                except:
-                    # 发生错误时回滚
-                    conn.rollback()
-                # 提交到数据库执行
-                conn.commit()
-                break
-            else:
-                data = fet[0]  # 返回某aid对应的view值，若为空，则跳出循环，并获得view序号
-                if not data:
-                    break
-        print("#################")
-        if v_num > 1 and data == None:  # 此aid已经有数据，更新值为NULL的值，即添加数据到view(num1)
+        cursor.execute("select * from bili_video_{0} where v_aid={1};".format(table_index,video_instance.aid))
+        fet = cursor.fetchone()
+        print("fet:%s"%str(fet))
+        # print(video_instance.aid)
+        if script_call_count%8  == 0:  # 判断这是第几个表的第几次操作，要填到对应v_view的第几列
+            v_colomn = 8
+        else:
+            v_colomn = script_call_count%8
+        if fet == None:  # 如果某个aid号还没有加到表中
+            sql_ins = "insert into bili_video_%s set v_aid=%s,v_title=%s,\
+            v_biaoqian=%s,v_author_mid=%s,v_author_name=%s,v_view%s=%s,\
+            v_danmu%s=%s,v_reply%s=%s,v_favor%s=%s,v_coin%s=%s,v_share%s=%s,\
+            v_like%s=%s,v_dislike%s=%s;"
+            row1 = [table_index,
+                    video_instance.aid,
+                    video_instance.title,
+                    video_instance.biaoqian,
+                    video_instance.author_mid,
+                    video_instance.author_name,
+                    v_colomn,
+                    video_instance.view,
+                    v_colomn,
+                    video_instance.danmu,
+                    v_colomn,
+                    video_instance.reply,
+                    v_colomn,
+                    video_instance.shoucang,
+                    v_colomn,
+                    video_instance.coin,
+                    v_colomn,
+                    video_instance.share,
+                    v_colomn,
+                    video_instance.like,
+                    v_colomn,
+                    video_instance.dislike
+                    ]
+            try:
+                # 执行sql_ins语句
+                cursor.execute(sql_ins,row1)
+            except:
+                # 发生错误时回滚
+                conn.rollback()
+            # 提交到数据库执行
+            conn.commit()
+        else:  # 此aid已经有数据，更新值为NULL的值，即添加数据到view(num1)
             sql_update = "update bili_video_%s set v_view%s=%s,v_danmu%s=%s,\
             v_reply%s=%s,v_favor%s=%s,v_coin%s=%s,v_share%s=%s,v_like%s=%s,\
             v_dislike%s=%s where v_aid=%s;"
             row2 = [table_index,
-                    v_num,
+                    v_colomn,
                     video_instance.view,
-                    v_num,
+                    v_colomn,
                     video_instance.danmu,
-                    v_num,
+                    v_colomn,
                     video_instance.reply,
-                    v_num,
+                    v_colomn,
                     video_instance.shoucang,
-                    v_num,
+                    v_colomn,
                     video_instance.coin,
-                    v_num,
+                    v_colomn,
                     video_instance.share,
-                    v_num,
+                    v_colomn,
                     video_instance.like,
-                    v_num,
+                    v_colomn,
                     video_instance.dislike,
                     video_instance.aid
                     ]
@@ -212,7 +213,7 @@ def task_bili():
         t_index = call_count//8
     # 将所有视频信息传入数据库
     for video_per_page in video_info_all:
-        save_video_db(video_per_page,t_index)
+        save_video_db(video_per_page,t_index,call_count)
     # print(results[0]) # 每个视频的信息list
     # parse_video(results)
     endtime = time()
