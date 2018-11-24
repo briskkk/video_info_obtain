@@ -1,11 +1,20 @@
 # -*- coding:UTF-8 -*-
  
-# 获取单机游戏前八页的视频列表，每页50个，tid=17
-# 将全部信息获取到video_info_all中，再写入数据库
-# 每隔两分钟运行一次，第一次运行要等待两分钟，待优化。
-# 写入数据的过程中，搜索每个aid号的视频是否存在，若不存在，则添加新的一行；若存在，则更新。更新方法为，查看v_view_n是否为None，若n为
-# None，则填入这一个位置，若不为None，则填入下一个位置。每运行八次脚本新建一个列表。但是在填v_view_n时，后期无法查看到该时间，下一步
-# 需要在get_zone_video_v2中加入时间戳。
+# 获取单机游戏模块按投稿时间排序中，连续10000个视频的播放量等信息
+# 单机游戏模块tid=17，按热度排序为newlist，脚本为周期性运行脚本，会将每次运行收集到的数据存入数据库
+# 脚本第一次运行：
+# 先访问page=1的信息，获取到当前视频总数N，按每页50个计算总页数，然后获取前200页的视频信息（共200×5=10000个）
+# 同时要保存第1个视频处于列表的倒数第几个视频（M=N），存到数据库中，用于之后脚本寻找该视频，因为newlist视频倒着数的排名不会变
+# 对每个视频建立video对象用来存视频播放量等数据，然后将全部信息获取到列表video_info_all中，再写入数据库
+# 脚本第n次运行：
+# 先访问page=1的信息，获取到当前视频总数Nn，按每页50个计算总页数，然后第一次获取的10000个视频中，第一个视频的位置为（Mn=Nn-M+1）
+# 计算出第一个视频在第几页（Mn//50 if Mn%50!=0 then +1），第10000个视频往后推200页（共收集201页数据）
+# 然后根据视频的aid号和数据库中已经存入的aid号做对比，如果相同将新的数据填入表中
+# 数据库中共有两类表格：
+# 1.t_count -- 1个，用于存脚本运行的次数以及每次运行的时间戳，同时存第一次视频总数N
+# 2.bili_video_n -- n个，用于存视频信息，每行代表一个视频，一个表可以存放8次视频播放信息，每过8次新建一个表格继续存数据
+# 每隔3h运行一次，每分钟发起近200次http请求，待优化
+# 相比v1增加了时间戳，并且信息部分增加了上传时间和视频时长信息
 
 import os
 import json
@@ -14,9 +23,10 @@ import platform
 from time import *
 from multiprocessing.dummy import Pool as ThreadPool
 from apscheduler.schedulers.background import BackgroundScheduler
-from classes import *
+from video_classes import *
 import pymysql
 from secret import *
+from datetime import datetime
 
 video_info_all = []
 scheduler = BackgroundScheduler()
@@ -27,7 +37,14 @@ URL_zone = "https://api.bilibili.com/x/web-interface/newlist?rid=17&type=0"
 def get_page_num(URL_zone,page=1):
     VIDEOS_PER_PAGE = 50
     URL_PAGE1 = URL_zone + "&pn={0}&ps=20".format(page)
-    VID_INFO1 = requests.get(url = URL_PAGE1).json()  # 从第一页获取到的前二十个视频列表
+    response1 = requests.get(url = URL_PAGE1,headers=headers())
+    if response1.status_code !=200:
+        for i in range(5):
+            sleep(0.3)
+            response1 = requests.get(url = URL_PAGE1,headers=headers())
+    response1.raise_for_status()
+    VID_INFO1 = response1.json()  # 从第一页获取到的前二十个视频列表
+    print(VID_INFO1)
     VID_COUNT = VID_INFO1['data']['page']['count']  # 视频总数
     if VID_COUNT%VIDEOS_PER_PAGE != 0:
         VID_PAGES = VID_COUNT//VIDEOS_PER_PAGE + 1  # 视频页数（最后一页视频数不足50）
@@ -40,8 +57,14 @@ def get_video_info(page_num):
     global URL_zone
     video_info_list = []
     URL_PAGE = URL_zone + "&pn={0}&ps=50".format(page_num)
-    VID_INFO = requests.get(url = URL_PAGE).json()  # 从第page_count页获取视频列表
-    # sleep(0.5)  # 延迟，避免太快ip被封
+    response = requests.get(url = URL_PAGE,headers=headers())
+    if response.status_code !=200:
+        for i in range(5):
+            sleep(0.3)
+            response = requests.get(url = URL_PAGE,headers=headers())
+    response.raise_for_status()
+    VID_INFO = response.json()  # 从第page_count页获取视频列表
+    sleep(0.5)  # 延迟，避免太快ip被封
     VID_ARCHIVES = VID_INFO['data']['archives']  # 每页中视频列表及每个视频标签等信息
     for video_count in range(len(VID_ARCHIVES)):  # 获取50个视频中每个视频的信息，传到对象Video中
         video = Video()
@@ -69,18 +92,21 @@ def create_tcount():
     # 创建记录数据库表格操作次数的table
     global cursor
     cursor.execute("""create table if not exists t_count
-                    (opera_count int)
+                    (opera_count int primary key,
+                    opera_time text)
                 """)
-    cursor.execute("select opera_count from t_count;")
-    if cursor.fetchone() == None:
+    cursor.execute("select count(opera_count) from t_count;")
+    if cursor.fetchone()[0] == 0:
         cursor.execute("insert into t_count set opera_count={};".format(1))
     conn.commit()
 
 def save_count():
     global cursor,conn
-    cursor.execute("select opera_count from t_count;")
+    cursor.execute("select count(opera_count) from t_count;")
     operacount = cursor.fetchone()[0]
-    cursor.execute("update t_count set opera_count=%d;" % (operacount+1))
+    dt=datetime.now()
+    cursor.execute("update t_count set opera_time=%s where opera_count=%d;" % (dt.timestamp(),operacount))
+    cursor.execute("insert into t_count set opera_count={};".format(operacount+1))
     return operacount
 
 def create_table_bili_video(TABLE_INDEX):
@@ -109,8 +135,8 @@ def save_video_db(video_instance_per_page,table_index,script_call_count):
     for video_instance in video_instance_per_page:  # 对于每一个video对象，首先查询是否已经在第table_index存在，如果不存在--insert，如果存在--update
         cursor.execute("select * from bili_video_{0} where v_aid={1};".format(table_index,video_instance.aid))
         fet = cursor.fetchone()
-        print("fet:%s"%str(fet))
-        # print(video_instance.aid)
+        # print("fet:%s"%str(fet))
+        print(video_instance.aid)
         if script_call_count%8  == 0:  # 判断这是第几个表的第几次操作，要填到对应v_view的第几列
             v_colomn = 8
         else:
@@ -231,14 +257,15 @@ def task_bili():
 # 循环执行
 def interval_trigger():
     global scheduler
-    scheduler.add_job(func=task_bili, trigger='interval', seconds=30, id='interval_job1')  #返回一个apscheduler.job.Job的实例，可以用来改变或者移除job
+    scheduler.add_job(func=task_bili, trigger='interval', minutes=30, id='interval_job1')  #返回一个apscheduler.job.Job的实例，可以用来改变或者移除job
 
 
 if __name__ == "__main__":
+    task_bili()
     # interval_trigger()
     # try:
     #     scheduler.start()
     # except (KeyboardInterrupt, SystemExit):
     #     scheduler.shutdown() #关闭job
-    # sleep(150)
-    task_bili()
+    # sleep(36000)
+
