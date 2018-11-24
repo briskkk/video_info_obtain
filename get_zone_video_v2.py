@@ -15,6 +15,7 @@
 # 2.bili_video_n -- n个，用于存视频信息，每行代表一个视频，一个表可以存放8次视频播放信息，每过8次新建一个表格继续存数据
 # 每隔3h运行一次，每分钟发起近200次http请求，待优化
 # 相比v1增加了时间戳，并且信息部分增加了上传时间和视频时长信息
+# 未解决问题：存储时延长，多线程会导致存储混乱，待解决
 
 import os
 import json
@@ -34,6 +35,7 @@ URL_zone = "https://api.bilibili.com/x/web-interface/newlist?rid=17&type=0"
 
 # 先访问page1，然后可以获取到一共有多少个视频，并写入数据库。
 def get_video_num(URL_zone,page=1):
+    global cursor,conn
     URL_PAGE1 = URL_zone + "&pn={0}&ps=20".format(page)
     response1 = requests.get(url = URL_PAGE1,headers=headers())
     if response1.status_code !=200:
@@ -43,8 +45,10 @@ def get_video_num(URL_zone,page=1):
     VID_INFO1 = response1.json()  # 从第一页获取到的前二十个视频列表
     VIDEO_NUM = VID_INFO1['data']['page']['count']  # 视频总数
     cursor.execute("select count(opera_count) from t_count;")
-    operacount = cursor.fetchone()[0]
+    operacount = cursor.fetchone()[0]-1
+    print(type(operacount))
     cursor.execute("update t_count set video_num=%d where opera_count=%d" % (VIDEO_NUM,operacount))
+    conn.commit()
     return VIDEO_NUM
     
 # get_video_info -- 获取某个页码上的视频对象信息，返回每页的视频对象列表（每页50个）
@@ -58,7 +62,7 @@ def get_video_info(page_num):
         response = requests.get(url = URL_PAGE,headers=headers())
     response.raise_for_status()  # 如果两次访问后返回值不是200则抛出异常终止程序
     VID_INFO = response.json()  # 从第page_count页获取视频列表
-    sleep(1.5)  # 延迟，避免太快ip被封
+    sleep(5)  # 延迟，避免太快ip被封
     VID_ARCHIVES = VID_INFO['data']['archives']  # 每页中视频列表及每个视频标签等信息
     for video_count in range(len(VID_ARCHIVES)):  # 获取50个视频中每个视频的信息，传到对象Video中
         video = Video()
@@ -80,6 +84,7 @@ def get_video_info(page_num):
         video.pubtime = video_info['pubdate']  # 发布时间
         video.duration = video_info['duration']  # 视频时长
         video_info_list.append(video)
+    print("get one page.")
     return video_info_list  # 返回视频对象列表
     
 # 已完成视频信息的读取以及多线程的实现，接下来需要把信息存到数据库，周期运行代码功能。
@@ -131,15 +136,18 @@ def create_table_bili_video(TABLE_INDEX):
 def save_video_db(video_instance_per_page,table_index,script_call_count):
     # 将数据保存至服务器MySQL数据库中
     global cursor,conn
+    print("save...")
     if script_call_count == 1:  # 如果是第一次运行，则insert
+        print("first operation...")
         for video_instance in video_instance_per_page:  # 对于每一个video对象，首先查询是否已经在第table_index存在，如果不存在--insert
-            cursor.execute("select * from bili_video_1 where v_aid={1};".format(video_instance.aid))
+            cursor.execute("select * from bili_video_1 where v_aid={};".format(video_instance.aid))
             fet = cursor.fetchone()
             if fet == None:  # 如果某个aid号还没有加到表中，为了避免两页有同样的视频号重复填入，保持第一次数据
                 sql_ins = "insert into bili_video_1 set v_aid=%s,v_title=%s,\
                 v_biaoqian=%s,v_author_mid=%s,v_author_name=%s,v_pubdate=%s,\
-                v_duration=%sv_view1=%s,v_danmu1=%s,v_reply1=%s,v_favor1=%s,\
+                v_duration=%s,v_view1=%s,v_danmu1=%s,v_reply1=%s,v_favor1=%s,\
                 v_coin1=%s,v_share1=%s,v_like1=%s,v_dislike1=%s;"
+                print("fet=None...")
                 row1 = [video_instance.aid,
                         video_instance.title,
                         video_instance.biaoqian,
@@ -165,6 +173,7 @@ def save_video_db(video_instance_per_page,table_index,script_call_count):
                 # 提交到数据库执行
                 conn.commit()
     elif script_call_count != 1 and script_call_count%8 == 1:  # 第n次运行，如果是新表（script_call_count%8 == 1） -- insert，否则 -- update
+        print("A new table...")
         # 首先把第一张表的v_aid等不会变动的信息拷贝到这张表上
         cursor.execute("insert into video_db.bili_video_{0}(v_aid) select v_aid from video_db.bili_video_1;".format(table_index))
         cursor.execute("insert into video_db.bili_video_{0}(v_title) select v_title from video_db.bili_video_1;".format(table_index))
@@ -243,12 +252,14 @@ def task_bili():
     # 查表获取此次运行的序号（返回值为int，表示此次是第几次运行）
     create_tcount()
     call_count = save_count()
+    print("调用次数为：%s"%call_count)
     if call_count%8 == 1:  # 满8次创建一个新表
         # 创建数据库中表格bili_video
         table_index = call_count//8 + 1
         create_table_bili_video(table_index)
     
     video_num_n = get_video_num(URL_zone)  # 获取本次操作视频排行总视频数
+    print("视频总数为：%s"%video_num_n)
     print("#######################")
     starttime = time()
     # pagelist = range(1,num_of_pages+1)
@@ -263,7 +274,7 @@ def task_bili():
         else:
             start_n = order_n//50 + 1
         pagelist = range(start_n,start_n+202)
-    pool = ThreadPool(4)
+    pool = ThreadPool(8)
     ret = pool.map(get_video_info,pagelist)
     video_info_all = video_info_all+ret
     pool.close()
