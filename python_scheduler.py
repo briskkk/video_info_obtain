@@ -41,6 +41,7 @@ def save_video_db(TABLE_INDEX):
     for num1 in range(1,5):
         cursor.execute("select view{0} from test_{1} where aid={2}".format(num1,TABLE_INDEX,aid))
         fet = cursor.fetchone()
+        print("fet:%s" %fet)
         if fet == None:  # 如果某个aid号还没有加到表中
             print("######")
             sql = "insert into test_{0} set aid=%s, view{1}=%s;".format(TABLE_INDEX,1)
