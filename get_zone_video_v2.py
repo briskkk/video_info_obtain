@@ -11,7 +11,7 @@
 # 计算出第一个视频在第几页（Mn//50 if Mn%50!=0 then +1），第10000个视频往后推200页（共收集201页数据）
 # 然后根据视频的aid号和数据库中已经存入的aid号做对比，如果相同将新的数据填入表中
 # 数据库中共有两类表格：
-# 1.t_count -- 1个，用于存脚本运行的次数以及每次运行的时间戳，同时存第一次视频总数N
+# 1.t_count_v2 -- 1个，用于存脚本运行的次数以及每次运行的时间戳，同时存第一次视频总数N
 # 2.bili_video_n -- n个，用于存视频信息，每行代表一个视频，一个表可以存放8次视频播放信息，每过8次新建一个表格继续存数据
 # 每隔3h运行一次，每分钟发起近200次http请求，待优化
 # 相比v1增加了时间戳，并且信息部分增加了上传时间和视频时长信息
@@ -44,10 +44,10 @@ def get_video_num(URL_zone,page=1):
     response1.raise_for_status()  # 如果两次访问后返回值不是200则抛出异常终止程序
     VID_INFO1 = response1.json()  # 从第一页获取到的前二十个视频列表
     VIDEO_NUM = VID_INFO1['data']['page']['count']  # 视频总数
-    cursor.execute("select count(opera_count) from t_count;")
+    cursor.execute("select count(opera_count) from t_count_v2;")
     operacount = cursor.fetchone()[0]-1
     print(type(operacount))
-    cursor.execute("update t_count set video_num=%d where opera_count=%d" % (VIDEO_NUM,operacount))
+    cursor.execute("update t_count_v2 set video_num=%d where opera_count=%d" % (VIDEO_NUM,operacount))
     conn.commit()
     return VIDEO_NUM
     
@@ -62,7 +62,7 @@ def get_video_info(page_num):
         response = requests.get(url = URL_PAGE,headers=headers())
     response.raise_for_status()  # 如果两次访问后返回值不是200则抛出异常终止程序
     VID_INFO = response.json()  # 从第page_count页获取视频列表
-    sleep(5)  # 延迟，避免太快ip被封
+    sleep(3)  # 延迟，避免太快ip被封
     VID_ARCHIVES = VID_INFO['data']['archives']  # 每页中视频列表及每个视频标签等信息
     for video_count in range(len(VID_ARCHIVES)):  # 获取50个视频中每个视频的信息，传到对象Video中
         video = Video()
@@ -92,29 +92,29 @@ def get_video_info(page_num):
 def create_tcount():
     # 创建记录数据库表格操作次数的table
     global cursor
-    cursor.execute("""create table if not exists t_count
+    cursor.execute("""create table if not exists t_count_v2
                     (opera_count int primary key,
                     opera_time text,
                     video_num int)
                 """)
-    cursor.execute("select count(opera_count) from t_count;")
+    cursor.execute("select count(opera_count) from t_count_v2;")
     if cursor.fetchone()[0] == 0:
-        cursor.execute("insert into t_count set opera_count={};".format(1))
+        cursor.execute("insert into t_count_v2 set opera_count={};".format(1))
     conn.commit()
 
 def save_count():
     global cursor,conn
-    cursor.execute("select count(opera_count) from t_count;")
+    cursor.execute("select count(opera_count) from t_count_v2;")
     operacount = cursor.fetchone()[0]
     dt=datetime.now()
-    cursor.execute("update t_count set opera_time=%s where opera_count=%d;" % (dt.timestamp(),operacount))
-    cursor.execute("insert into t_count set opera_count={};".format(operacount+1))
+    cursor.execute("update t_count_v2 set opera_time=%s where opera_count=%d;" % (dt.timestamp(),operacount))
+    cursor.execute("insert into t_count_v2 set opera_count={};".format(operacount+1))
     return operacount
 
 def create_table_bili_video(TABLE_INDEX):
     # 创建数据库
     global cursor
-    cursor.execute("""create table if not exists bili_video_{}
+    cursor.execute("""create table if not exists bili_video_v2_{}
                     (v_aid int primary key,
                     v_title text,
                     v_biaoqian text,
@@ -133,17 +133,17 @@ def create_table_bili_video(TABLE_INDEX):
                     )
                 """.format(TABLE_INDEX))
                 
-def save_video_db(video_instance_per_page,table_index,script_call_count):
+def save_video_db(video_instance_per_page,table_index,script_call_count,page_i):
     # 将数据保存至服务器MySQL数据库中
     global cursor,conn
-    print("save...")
+    print("save No.%s page..."%page_i)
     if script_call_count == 1:  # 如果是第一次运行，则insert
         print("first operation...")
         for video_instance in video_instance_per_page:  # 对于每一个video对象，首先查询是否已经在第table_index存在，如果不存在--insert
-            cursor.execute("select * from bili_video_1 where v_aid={};".format(video_instance.aid))
+            cursor.execute("select * from bili_video_v2_1 where v_aid={};".format(video_instance.aid))
             fet = cursor.fetchone()
             if fet == None:  # 如果某个aid号还没有加到表中，为了避免两页有同样的视频号重复填入，保持第一次数据
-                sql_ins = "insert into bili_video_1 set v_aid=%s,v_title=%s,\
+                sql_ins = "insert into bili_video_v2_1 set v_aid=%s,v_title=%s,\
                 v_biaoqian=%s,v_author_mid=%s,v_author_name=%s,v_pubdate=%s,\
                 v_duration=%s,v_view1=%s,v_danmu1=%s,v_reply1=%s,v_favor1=%s,\
                 v_coin1=%s,v_share1=%s,v_like1=%s,v_dislike1=%s;"
@@ -172,21 +172,21 @@ def save_video_db(video_instance_per_page,table_index,script_call_count):
                     conn.rollback()
                 # 提交到数据库执行
                 conn.commit()
-    elif script_call_count != 1 and script_call_count%8 == 1:  # 第n次运行，如果是新表（script_call_count%8 == 1） -- insert，否则 -- update
+    elif (script_call_count != 1) and (script_call_count%8 == 1):  # 第n次运行，如果是新表（script_call_count%8 == 1） -- insert，否则 -- update
         print("A new table...")
         # 首先把第一张表的v_aid等不会变动的信息拷贝到这张表上
-        cursor.execute("insert into video_db.bili_video_{0}(v_aid) select v_aid from video_db.bili_video_1;".format(table_index))
-        cursor.execute("insert into video_db.bili_video_{0}(v_title) select v_title from video_db.bili_video_1;".format(table_index))
-        cursor.execute("insert into video_db.bili_video_{0}(v_biaoqian) select v_biaoqian from video_db.bili_video_1;".format(table_index))
-        cursor.execute("insert into video_db.bili_video_{0}(v_author_mid) select v_author_mid from video_db.bili_video_1;".format(table_index))
-        cursor.execute("insert into video_db.bili_video_{0}(v_author_name) select v_author_name from video_db.bili_video_1;".format(table_index))
-        cursor.execute("insert into video_db.bili_video_{0}(v_pubdate) select v_pubdate from video_db.bili_video_1;".format(table_index))
-        cursor.execute("insert into video_db.bili_video_{0}(v_duration) select v_duration from video_db.bili_video_1;".format(table_index))
+        # 判断是否已经拷贝过来
+        cursor.execute("select v_pubdate from bili_video_v2_{0};".format(table_index))
+        fet_isnone = cursor.fetchone()
+        conn.commit()
+        if fet_isnone == None:  # 如果没有拷贝过来则拷贝
+            cursor.execute("insert into video_db.bili_video_v2_{}(v_aid,v_title,v_biaoqian,v_author_mid,v_author_name,v_pubdate,v_duration) select v_aid,v_title,v_biaoqian,v_author_mid,v_author_name,v_pubdate,v_duration from video_db.bili_video_v2_1;".format(table_index))
+            conn.commit()
         for video_instance in video_instance_per_page:  # 对于每一个video对象 -- update
-            cursor.execute("select * from bili_video_{0} where v_aid={1};".format(table_index,video_instance.aid))
+            cursor.execute("select v_pubdate from bili_video_v2_{0} where v_aid={1};".format(table_index,video_instance.aid))
             fet = cursor.fetchone()
             if fet != None:  # 如果某个aid号不在表中，则丢弃；若在表中，则update
-                sql_update1 = "update bili_video_%s set v_view1=%s,v_danmu1=%s,\
+                sql_update1 = "update bili_video_v2_%s set v_view1=%s,v_danmu1=%s,\
                 v_reply1=%s,v_favor1=%s,v_coin1=%s,v_share1=%s,v_like1=%s,\
                 v_dislike1=%s where v_aid=%s;"
                 row2 = [table_index,
@@ -206,15 +206,15 @@ def save_video_db(video_instance_per_page,table_index,script_call_count):
                     conn.rollback()
                 conn.commit()
     else:  # update
-        for video_instance in video_instance_per_page:  # 对于每一个video对象，首先查询是否已经在第table_index存在，如果不存在--insert，如果存在--update
-            cursor.execute("select * from bili_video_{0} where v_aid={1};".format(table_index,video_instance.aid))
+        for video_instance in video_instance_per_page:  # 对于每一个video对象 -- update
+            cursor.execute("select v_pubdate from bili_video_v2_{0} where v_aid={1};".format(table_index,video_instance.aid))
             fet = cursor.fetchone()
             if script_call_count%8  == 0:  # 判断这是第几个表的第几次操作，要填到对应v_view的第几列
                 v_colomn = 8
             else:
                 v_colomn = script_call_count%8
             if fet != None:  # 如果某个aid号在表中，update
-                sql_update2 = "update bili_video_%s set v_view%s=%s,v_danmu%s=%s,\
+                sql_update2 = "update bili_video_v2_%s set v_view%s=%s,v_danmu%s=%s,\
                 v_reply%s=%s,v_favor%s=%s,v_coin%s=%s,v_share%s=%s,v_like%s=%s,\
                 v_dislike%s=%s where v_aid=%s;"
                 row2 = [table_index,
@@ -257,6 +257,7 @@ def task_bili():
         # 创建数据库中表格bili_video
         table_index = call_count//8 + 1
         create_table_bili_video(table_index)
+        conn.commit()
     
     video_num_n = get_video_num(URL_zone)  # 获取本次操作视频排行总视频数
     print("视频总数为：%s"%video_num_n)
@@ -264,19 +265,21 @@ def task_bili():
     starttime = time()
     # pagelist = range(1,num_of_pages+1)
     if call_count == 1:
-        pagelist = range(1,201)
+        pagelist = range(1,402)
     else:
-        cursor.execute("select video_num from t_count where operacount=1;")
+        cursor.execute("select video_num from t_count_v2 where opera_count=1;")
+        conn.commit()
         video_num_1 = cursor.fetchone()[0]
         order_n = (int(video_num_n)-int(video_num_1)+1)
         if order_n%50 == 0:
             start_n = order_n//50
         else:
             start_n = order_n//50 + 1
-        pagelist = range(start_n,start_n+202)
+        pagelist = range(start_n,start_n+405)
     pool = ThreadPool(8)
     ret = pool.map(get_video_info,pagelist)
-    video_info_all = video_info_all+ret
+    video_info_all = ret
+    print("video_info_all:%d"%len(video_info_all))
     pool.close()
     pool.join()
     # 确定此次要在第几个表上进行存储操作
@@ -285,8 +288,10 @@ def task_bili():
     else:
         t_index = call_count//8
     # 将所有视频信息传入数据库
+    page_i = 1
     for video_per_page in video_info_all:
-        save_video_db(video_per_page,t_index,call_count)
+        save_video_db(video_per_page,t_index,call_count,page_i)
+        page_i = page_i + 1
     endtime = time()
     print('Use time is ',(endtime-starttime))
     # for i in range(50):
@@ -301,15 +306,15 @@ def task_bili():
 # 循环执行
 def interval_trigger():
     global scheduler
-    scheduler.add_job(func=task_bili, trigger='interval', minutes=30, id='interval_job1')  #返回一个apscheduler.job.Job的实例，可以用来改变或者移除job
+    scheduler.add_job(func=task_bili, trigger='interval', hours=1, id='interval_job1')  #返回一个apscheduler.job.Job的实例，可以用来改变或者移除job
 
 
 if __name__ == "__main__":
     task_bili()
-    # interval_trigger()
-    # try:
-    #     scheduler.start()
-    # except (KeyboardInterrupt, SystemExit):
-    #     scheduler.shutdown() #关闭job
-    # sleep(36000)
+    interval_trigger()
+    try:
+        scheduler.start()
+    except (KeyboardInterrupt, SystemExit):
+        scheduler.shutdown() #关闭job
+    sleep(60000)
 
