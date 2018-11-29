@@ -14,7 +14,7 @@ import platform
 from time import *
 from multiprocessing.dummy import Pool as ThreadPool
 from apscheduler.schedulers.background import BackgroundScheduler
-from classes import *
+from video_classes import *
 import pymysql
 from secret import *
 
